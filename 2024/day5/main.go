@@ -12,13 +12,11 @@ type page int
 type pageSet map[page]bool
 
 type pageGraph struct {
-	startingNodes pageSet
-	pagesMap      map[page]pageSet
+	pagesMap map[page]pageSet
 }
 
 func createPageGraph(lines []string) *pageGraph {
 	pg := &pageGraph{}
-	pg.startingNodes = make(pageSet)
 	pg.pagesMap = make(map[page]pageSet)
 	for _, line := range lines {
 		pg.addPage(line)
@@ -39,40 +37,16 @@ func (pg *pageGraph) addPage(line string) {
 	pg.connectPages(page(from), page(to))
 }
 
-func (pg *pageGraph) addPageNum(pageNum page, isFrom bool) {
+func (pg *pageGraph) addPageNum(pageNum page) {
 	if _, ok := pg.pagesMap[pageNum]; !ok {
 		pg.pagesMap[pageNum] = make(pageSet)
-		if isFrom {
-			pg.startingNodes[pageNum] = true
-		}
-	}
-	if !isFrom {
-		delete(pg.startingNodes, pageNum)
 	}
 }
 
 func (pg *pageGraph) connectPages(from, to page) {
-	pg.addPageNum(from, true)
-	pg.addPageNum(to, false)
+	pg.addPageNum(from)
+	pg.addPageNum(to)
 	pg.pagesMap[from][to] = true
-}
-
-func (pg *pageGraph) dfs(current, end page) []page {
-	if current == end {
-		return []page{}
-	}
-	nextPages, ok := pg.pagesMap[current]
-	if !ok {
-		return nil
-	}
-	for nextPage := range nextPages {
-		history := pg.dfs(nextPage, end)
-		if history != nil {
-			history = append(history, nextPage)
-			return history
-		}
-	}
-	return nil
 }
 
 func main() {
@@ -84,9 +58,21 @@ func main() {
 	linesPrintQueue := readFile("day5/input_pages.txt")
 	pagesList := createPagesList(linesPrintQueue)
 
-	filteredPagesList := filterInvalidPages(graph, pagesList)
+	validPages := filterInvalidPages(graph, pagesList)
+	fmt.Println("Part 1:", sumMiddlePage(validPages), len(validPages))
+
+	validPages = getFixedInvalidPages(graph, pagesList)
+	fmt.Println("Part 2:", sumMiddlePage(validPages), len(validPages))
 
 	fmt.Println("Finished in", time.Since(start))
+}
+
+func sumMiddlePage(listPages [][]page) int {
+	sum := 0
+	for _, pages := range listPages {
+		sum += int(pages[len(pages)/2])
+	}
+	return sum
 }
 
 func filterInvalidPages(graph *pageGraph, list [][]page) [][]page {
@@ -101,32 +87,53 @@ func filterInvalidPages(graph *pageGraph, list [][]page) [][]page {
 	return validPages
 }
 
-func isValidPageList(graph *pageGraph, pages []page) bool {
-	invalidPages := make(pageSet)
-	var lastRelevantPage page = -1
-	for _, page := range pages {
-		// invalid page occurance
-		if _, match := invalidPages[page]; match {
-			return false
+func getFixedInvalidPages(graph *pageGraph, list [][]page) [][]page {
+	fixedPages := [][]page{}
+
+	for _, pages := range list {
+		fixedList, fixApplied := getFixedInvalidPage(graph, pages)
+		if fixApplied {
+			fixedPages = append(fixedPages, *fixedList)
 		}
-		// skip page if it is not in graph -> can occure anywhere
-		if _, ok := graph.pagesMap[page]; !ok {
+	}
+
+	return fixedPages
+}
+
+func isValidPageList(graph *pageGraph, pages []page) bool {
+	for i := 0; i < len(pages); i++ {
+		// skip page if it is not in graph -> can occur anywhere
+		followingPages, ok := graph.pagesMap[pages[i]]
+		if !ok {
 			continue
 		}
-		if _, ok := graph.startingNodes[page]; ok {
-			lastRelevantPage = page
-		}
-		if lastRelevantPage == -1 {
-			lastRelevantPage = page
-		} else {
-			history := graph.dfs(lastRelevantPage, page)
-			if history == nil {
+		for _, prevPage := range pages[:i] {
+			if followingPages[prevPage] {
 				return false
 			}
-
 		}
-		invalidPages[page] = true
 	}
+	return true
+}
+
+func getFixedInvalidPage(graph *pageGraph, list []page) (*[]page, bool) {
+	fixedList := append([]page{}, list...)
+	fixApplied := false
+	for i := 0; i < len(fixedList); i++ {
+		followingPages, ok := graph.pagesMap[fixedList[i]]
+		if !ok {
+			continue
+		}
+		for j, prevPage := range fixedList[:i] {
+			if followingPages[prevPage] {
+				fixedList[i], fixedList[j] = fixedList[j], fixedList[i]
+				i--
+				fixApplied = true
+				break
+			}
+		}
+	}
+	return &fixedList, fixApplied
 }
 
 func createPagesList(linesPrintQueue []string) [][]page {
