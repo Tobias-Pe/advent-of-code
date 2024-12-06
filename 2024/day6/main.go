@@ -1,7 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"image/color"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -21,6 +27,38 @@ type lab struct {
 	guard             coord
 	guardDir          coord
 	tileCoordsTouched map[coord]bool
+}
+
+type game struct {
+	laboratory *lab
+}
+
+func (g game) Update() error {
+	if g.laboratory.tileCoordsTouched == nil {
+		g.laboratory.tileCoordsTouched = make(map[coord]bool)
+	}
+	if g.laboratory.isValid(g.laboratory.guard) {
+		g.laboratory.tileCoordsTouched[g.laboratory.guard] = true
+		g.laboratory.moveGuard()
+	}
+	return nil
+}
+
+func (g game) Draw(screen *ebiten.Image) {
+	op := &text.DrawOptions{}
+	op.ColorScale.ScaleWithColor(color.White)
+	const size = 27
+	op.LineSpacing = size * 1.01
+	s := g.laboratory.String()
+	text.Draw(screen, s, &text.GoTextFace{
+		Source: mplusFaceSource,
+		Size:   size,
+	}, op)
+}
+
+func (g game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
+	//TODO implement me
+	return len(g.laboratory.roomTiles[0]) * 30, len(g.laboratory.roomTiles) * 30
 }
 
 func (l *lab) isValid(c coord) bool {
@@ -65,24 +103,29 @@ func (l *lab) print(visualize bool) {
 	if !visualize {
 		return
 	}
+	fmt.Println(l)
+}
+
+func (l *lab) String() string {
 	output := strings.Builder{}
 	for i, tile := range l.roomTiles {
 		for j, s := range tile {
 			currentCord := coord{i, j}
 			if i == l.guard.row && j == l.guard.col {
-				output.WriteString("👮‍♂️")
+				output.WriteString("!")
 			} else if s == "#" {
-				output.WriteString("🚧")
+				output.WriteString("¤")
 			} else if l.tileCoordsTouched[currentCord] {
-				output.WriteString("🟨")
+				output.WriteString("★")
 			} else {
-				output.WriteString("⬜")
+				output.WriteString(".")
 			}
 		}
 		output.WriteString("\n")
 	}
 	output.WriteString(fmt.Sprintf("Guard Dir: %v\n", l.guardDir))
-	fmt.Println(output.String())
+	output.WriteString(fmt.Sprintf("Tilecount: %v\n", len(l.tileCoordsTouched)))
+	return output.String()
 }
 
 func (l *lab) moveGuard() {
@@ -141,18 +184,40 @@ func (l *lab) fakeObstacles(abortAfterIterations int, visualize bool) (fakedObst
 func main() {
 	start := time.Now()
 
-	inputLines := readFile("day6/input_exp.txt")
+	inputLines := readFile("day6/input.txt")
 	laboratory := parseLab(inputLines)
 
-	const abortAfterIterations = 10000
-	tiles, aborted := laboratory.simulateGuard(abortAfterIterations, true)
+	const abortAfterIterations = 6666
+	tiles, aborted := laboratory.simulateGuard(abortAfterIterations, false)
 	fmt.Println("Part 1:", tiles, aborted)
 
 	laboratory = parseLab(inputLines)
-	fakedObstacles := laboratory.fakeObstacles(abortAfterIterations, true)
+	fakedObstacles := laboratory.fakeObstacles(abortAfterIterations, false)
 	fmt.Println("Part 2:", fakedObstacles)
 
 	fmt.Println("Finished in", time.Since(start))
+
+	g := &game{
+		laboratory: parseLab(inputLines),
+	}
+	ebiten.SetWindowTitle("Part1")
+	ebiten.SetFullscreen(true)
+	err := ebiten.RunGame(g)
+	if err != nil {
+		panic(err)
+	}
+}
+
+var (
+	mplusFaceSource *text.GoTextFaceSource
+)
+
+func init() {
+	s, err := text.NewGoTextFaceSource(bytes.NewReader(fonts.PressStart2P_ttf))
+	if err != nil {
+		log.Fatal(err)
+	}
+	mplusFaceSource = s
 }
 
 func readFile(file string) []string {
