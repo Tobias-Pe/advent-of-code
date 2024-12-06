@@ -4,12 +4,9 @@ Welcome to my Advent of Code repository! 🎄✨
 
 This is where I'll be sharing my solutions and thoughts as I tackle the coding challenges throughout December.
 
-<video autoplay loop muted>
-  <source src="2024/day6/2024Day6Part1Viz.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-<figcaption>My first Visualization: <a href="2024/day6/main.go">2024 | Day 6 👮🧪 | Part 1</a> </figcaption>
+https://github.com/user-attachments/assets/8b5ecad8-2ed9-487e-9bc7-533a04657af8
 
+<figcaption>My first Visualization: <a href="2024/day6/main.go">2024 | Day 6 👮🧪 | Part 1</a> </figcaption>
 
 ## About Advent of Code
 
