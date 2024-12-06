@@ -4,6 +4,13 @@ Welcome to my Advent of Code repository! 🎄✨
 
 This is where I'll be sharing my solutions and thoughts as I tackle the coding challenges throughout December.
 
+<video autoplay loop muted>
+  <source src="2024/day6/2024Day6Part1Viz.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+<figcaption>My first Visualization: <a href="2024/day6/main.go">2024 | Day 6 👮🧪 | Part 1</a> </figcaption>
+
+
 ## About Advent of Code
 
 [Advent of Code](https://adventofcode.com/) is an annual coding event where participants solve a series of programming puzzles. Each day, a new challenge is unlocked, and the puzzles often involve a mix of algorithms, data structures, and problem-solving skills. It's a great way to have fun, learn new things, and celebrate the holiday season with fellow coders around the world.
