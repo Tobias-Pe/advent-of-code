@@ -8,86 +8,63 @@ import (
 	"time"
 )
 
-var dP map[stone]stoneArrangement
-
-type stoneArrangement []stone
+type stoneArrangement map[stone]int
 
 func createStoneArrangement(input string) stoneArrangement {
-	stoneArrangement := make(stoneArrangement, len(strings.Fields(input)))
-	for i, s := range strings.Fields(input) {
-		stoneArrangement[i] = createStone(s)
+	stoneArrangement := make(stoneArrangement)
+	for _, s := range strings.Fields(input) {
+		stoneArrangement[createStone(s)] += 1
 	}
 	return stoneArrangement
 }
 
 func (stA *stoneArrangement) blink() {
-	for i := 0; i < len(*stA); i++ {
-		newStone, isPresent := (*stA)[i].blink()
+	newSta := stoneArrangement{}
+	for st, mul := range *stA {
+		newStone, isPresent := st.blink()
+		newSta[st] += mul
 		if isPresent {
-			tmpStALeft := append([]stone{}, (*stA)[:i+1]...)
-			tmpStALeft = append(tmpStALeft, newStone)
-			*stA = append(tmpStALeft, (*stA)[i+1:]...)
-			i++
+			newSta[newStone] += mul
 		}
 	}
+	*stA = newSta
 }
 
 func (stA *stoneArrangement) blinkTimes(times int) {
-	dP = make(map[stone]stoneArrangement)
 	for i := 0; i < times; i++ {
 		stA.blink()
-		fmt.Println(i, stA)
+		//fmt.Println(i, stA)
 	}
 }
 
-func (stA stoneArrangement) getBlinkAt(age int) stoneArrangement {
-	stAAtAge := stoneArrangement{}
-	for _, s := range stA {
-		stAAtAge = append(stAAtAge, s.getBlinkAt(age)...)
+func (stA stoneArrangement) count() int {
+	sum := 0
+	for _, count := range stA {
+		sum += count
 	}
-	return stAAtAge
-}
-
-func (s stone) getBlinkAt(age int) stoneArrangement {
-
-	if age <= 0 {
-		return []stone{s}
-	}
-	lookedForStone := stone{
-		num: s.num,
-		age: age,
-	}
-	if dP[lookedForStone] != nil {
-		return dP[lookedForStone]
-	}
-	stA := append(stoneArrangement{}, s.getBlinkAt(age-1)...)
-	stA.blink()
-	dP[lookedForStone] = stA
-	return dP[lookedForStone]
+	return sum
 }
 
 func (stA stoneArrangement) String() string {
 	sB := strings.Builder{}
-	for i := 0; i < len(stA); i++ {
-		sB.WriteString(fmt.Sprintf("%v ", (stA)[i].num))
+	for st, mul := range stA {
+		sB.WriteString(fmt.Sprintf("|%v * %v", st, mul))
 	}
 	return sB.String()
 }
 
 type stone struct {
 	num int
-	age int
 }
 
 func createStone(s string) stone {
-	st := stone{age: 0}
+	st := stone{}
 	atoi, _ := strconv.Atoi(s)
 	st.num = atoi
 	return st
 }
 
 func (s *stone) blink() (stone, bool) {
-	s.age = s.age + 1
 	if s.num == 0 {
 		s.num = 1
 		return stone{}, false
@@ -103,7 +80,7 @@ func (s *stone) blink() (stone, bool) {
 			panic(err)
 		}
 		s.num = s1Num
-		return stone{num: s2Num, age: 0}, true
+		return stone{num: s2Num}, true
 	}
 	s.num *= 2024
 	return stone{}, false
@@ -113,17 +90,15 @@ func main() {
 	start := time.Now()
 
 	input := readFile("day11/input.txt")
-	dP = make(map[stone]stoneArrangement)
 	arrangement := createStoneArrangement(input[0])
 	fmt.Println(arrangement.String())
-	arrangement.blinkTimes(6)
-	fmt.Println("Part 1:", len(arrangement))
-	fmt.Println("Finished in", time.Since(start))
-	start = time.Now()
+	arrangement.blinkTimes(25)
+	fmt.Println("Part 1:", arrangement.count())
+
 	arrangement = createStoneArrangement(input[0])
 	fmt.Println(arrangement.String())
-	arrangement.getBlinkAt(6)
-	fmt.Println("Part 1 fast:", len(arrangement))
+	arrangement.blinkTimes(75)
+	fmt.Println("Part 2:", arrangement.count())
 
 	fmt.Println("Finished in", time.Since(start))
 }
