@@ -66,7 +66,6 @@ func (r region) calcSides(ga gardenArrangement) int {
 			}
 		}
 	}
-	fmt.Println(r.flowerType, sides)
 	return sides
 }
 
