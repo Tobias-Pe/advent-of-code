@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -9,6 +10,21 @@ import (
 
 type coordinate struct {
 	i, j int
+}
+
+func (c coordinate) getNextPos(instruction string) coordinate {
+	switch instruction {
+	case "^":
+		return coordinate{c.i - 1, c.j}
+	case "v":
+		return coordinate{c.i + 1, c.j}
+	case ">":
+		return coordinate{c.i, c.j + 1}
+	case "<":
+		return coordinate{c.i, c.j - 1}
+	default:
+		return c
+	}
 }
 
 func (c coordinate) String() string {
@@ -20,23 +36,102 @@ func (c coordinate) getNeighbours() []coordinate {
 }
 
 func (c coordinate) getGPS() int {
-	return c.i + c.j*100
+	return c.i*100 + c.j
 }
 
 type warehouse struct {
 	layout       [][]string
 	instructions []string
+	robot        coordinate
+}
+
+func (w warehouse) isValid(coord coordinate) bool {
+	return coord.i >= 0 && coord.j >= 0 && coord.i < len(w.layout) && coord.j < len(w.layout[coord.i])
+}
+
+func (w *warehouse) executeInstruction() {
+	w.move(w.robot, w.instructions[0])
+	w.instructions = w.instructions[1:]
+}
+
+func (w *warehouse) executeInstructions(out io.Writer) {
+	for len(w.instructions) > 0 {
+		fmt.Fprintln(out, w)
+		w.executeInstruction()
+	}
+	fmt.Fprintln(out, w)
+}
+
+func (w *warehouse) move(c coordinate, instruction string) bool {
+	nextPos := c.getNextPos(instruction)
+	if !w.isValid(nextPos) {
+		return false
+	}
+	if w.layout[nextPos.i][nextPos.j] == "#" {
+		return false
+	}
+	if w.layout[nextPos.i][nextPos.j] == "O" {
+		w.move(nextPos, instruction)
+	}
+	if w.layout[nextPos.i][nextPos.j] == "." {
+		w.layout[nextPos.i][nextPos.j] = w.layout[c.i][c.j]
+		w.layout[c.i][c.j] = "."
+		if c.i == w.robot.i && c.j == w.robot.j {
+			w.robot = coordinate{nextPos.i, nextPos.j}
+		}
+		return true
+	}
+	return false
+}
+
+func (w warehouse) String() string {
+	sb := strings.Builder{}
+	for i, line := range w.layout {
+		for j, cell := range line {
+			if w.robot.i == i && w.robot.j == j {
+				sb.WriteString("🤖")
+			} else {
+				if cell == "#" {
+					sb.WriteString("🧱")
+				} else if cell == "O" {
+					sb.WriteString("📦")
+				} else {
+					sb.WriteString("⬜")
+				}
+			}
+		}
+		sb.WriteString("\n")
+	}
+	if w.instructions != nil && len(w.instructions) > 0 {
+		sb.WriteString(fmt.Sprintf("Next move: %s\n", w.instructions[0]))
+	}
+	return sb.String()
+}
+
+func (w warehouse) sumGPS() int {
+	sum := 0
+	for i, line := range w.layout {
+		for j, cell := range line {
+			if cell == "O" {
+				sum += coordinate{i, j}.getGPS()
+			}
+		}
+	}
+	return sum
 }
 
 func main() {
 	start := time.Now()
 
-	readFile("day15/input.txt")
+	wh := readFile("day15/input.txt")
+	wh.sumGPS()
+	wh.executeInstructions(io.Discard)
+	fmt.Println("Part 1:", wh.sumGPS())
 
 	fmt.Println("Finished in", time.Since(start))
 }
 
-func readFile(file string) []string {
+func readFile(file string) warehouse {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		fmt.Printf("Error on reading file: %s", err.Error())
@@ -44,6 +139,30 @@ func readFile(file string) []string {
 	lines := string(content)
 	lines = strings.ReplaceAll(lines, "\r\n", "\n")
 	lines = strings.TrimSpace(lines)
-	split := strings.Split(lines, "\n")
-	return split
+	inputs := strings.Split(lines, "\n\n")
+	warehouseLines := strings.Split(inputs[0], "\n")
+	warehouse := warehouse{
+		layout:       make([][]string, len(warehouseLines)),
+		instructions: []string{},
+	}
+	for i, line := range warehouseLines {
+		tileRow := make([]string, len(line))
+		for j, cell := range line {
+			if cell == '@' {
+				warehouse.robot = coordinate{i, j}
+				tileRow[j] = "."
+			} else {
+				tileRow[j] = string(cell)
+			}
+		}
+		split := strings.Split(line, "")
+		warehouse.layout[i] = split
+	}
+	instructionLines := strings.Split(inputs[1], "\n")
+	for _, line := range instructionLines {
+		for _, cell := range line {
+			warehouse.instructions = append(warehouse.instructions, string(cell))
+		}
+	}
+	return warehouse
 }
