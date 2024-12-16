@@ -46,9 +46,13 @@ func (d destination) String() string {
 }
 
 type state struct {
-	c    coordinate
-	dir  coordinate
-	cost int64
+	v    vector
+	cost int
+}
+
+type vector struct {
+	c   coordinate
+	dir coordinate
 }
 
 type maze struct {
@@ -72,54 +76,120 @@ func (m maze) String() string {
 	return sb.String()
 }
 
-func (m maze) dsa() (int64, map[coordinate]float64) {
-	costs := make(map[coordinate]float64)
-	for i := range m.tiles {
-		for j := range m.tiles[i] {
-			costs[coordinate{i, j}] = math.Inf(1)
-		}
-	}
-	costs[m.start] = 0
-	pq := &stateHeap{state{m.start, coordinate{0, 1}, 0}}
+func (m maze) dsa() (int, int) {
+	prevs := make(map[vector][]vector)
+	costGroups := make(map[coordinate][]vector)
+	costs := make(map[vector]int)
+	initState := state{v: vector{c: m.start, dir: coordinate{0, 1}}, cost: 0}
+	costs[initState.v] = initState.cost
+	pq := &stateHeap{initState}
 	heap.Init(pq)
 	for pq.Len() > 0 {
 		curr := heap.Pop(pq).(state)
-		currDir := curr.dir
-		neighbour := curr.c.add(currDir)
-		if m.isValid(neighbour) && costs[neighbour] > costs[curr.c]+1 {
-			costs[neighbour] = costs[curr.c] + 1
-			heap.Push(pq, state{neighbour, currDir, int64(costs[neighbour])})
+		neigbourState := state{v: vector{c: curr.v.c.add(curr.v.dir), dir: curr.v.dir}, cost: curr.cost + 1}
+		if _, ok := costs[neigbourState.v]; m.isValid(neigbourState.v.c) && !ok {
+			costs[neigbourState.v] = neigbourState.cost
+			heap.Push(pq, neigbourState)
+			costGroups[neigbourState.v.c] = append(costGroups[neigbourState.v.c], neigbourState.v)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
+		} else if m.isValid(neigbourState.v.c) && costs[neigbourState.v] == neigbourState.cost {
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
 		}
-		currDir = curr.dir.turnRight()
-		neighbour = curr.c.add(currDir)
-		if m.isValid(neighbour) && costs[neighbour] > costs[curr.c]+1001 {
-			costs[neighbour] = costs[curr.c] + 1001
-			heap.Push(pq, state{neighbour, currDir, int64(costs[neighbour])})
+		currDir := curr.v.dir.turnRight()
+		neigbourState = state{v: vector{c: curr.v.c.add(currDir), dir: currDir}, cost: curr.cost + 1001}
+		if _, ok := costs[neigbourState.v]; m.isValid(neigbourState.v.c) && !ok {
+			costs[neigbourState.v] = neigbourState.cost
+			heap.Push(pq, neigbourState)
+			costGroups[neigbourState.v.c] = append(costGroups[neigbourState.v.c], neigbourState.v)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
+		} else if m.isValid(neigbourState.v.c) && costs[neigbourState.v] == neigbourState.cost {
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
 		}
-		currDir = currDir.turnRight()
-		neighbour = curr.c.add(currDir)
-		if m.isValid(neighbour) && costs[neighbour] > costs[curr.c]+2001 {
-			costs[neighbour] = costs[curr.c] + 2001
-			heap.Push(pq, state{neighbour, currDir, int64(costs[neighbour])})
+		currDir = curr.v.dir.turnRight().turnRight()
+		neigbourState = state{v: vector{c: curr.v.c.add(currDir), dir: currDir}, cost: curr.cost + 2001}
+		if _, ok := costs[neigbourState.v]; m.isValid(neigbourState.v.c) && !ok {
+			costs[neigbourState.v] = neigbourState.cost
+			heap.Push(pq, neigbourState)
+			costGroups[neigbourState.v.c] = append(costGroups[neigbourState.v.c], neigbourState.v)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
+		} else if m.isValid(neigbourState.v.c) && costs[neigbourState.v] == neigbourState.cost {
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
 		}
-		currDir = curr.dir.turnLeft()
-		neighbour = curr.c.add(currDir)
-		if m.isValid(neighbour) && costs[neighbour] > costs[curr.c]+1001 {
-			costs[neighbour] = costs[curr.c] + 1001
-			heap.Push(pq, state{neighbour, currDir, int64(costs[neighbour])})
+		currDir = curr.v.dir.turnLeft()
+		neigbourState = state{v: vector{c: curr.v.c.add(currDir), dir: currDir}, cost: curr.cost + 1001}
+		if _, ok := costs[neigbourState.v]; m.isValid(neigbourState.v.c) && !ok {
+			costs[neigbourState.v] = neigbourState.cost
+			heap.Push(pq, neigbourState)
+			costGroups[neigbourState.v.c] = append(costGroups[neigbourState.v.c], neigbourState.v)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
+		} else if m.isValid(neigbourState.v.c) && costs[neigbourState.v] == neigbourState.cost {
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], prevs[curr.v]...)
+			prevs[neigbourState.v] = append(prevs[neigbourState.v], curr.v)
 		}
-		//m.progress(costs)
 	}
-	return int64(costs[m.end]), costs
+	minCost := math.MaxInt64
+	for _, vec := range costGroups[m.end] {
+		minCost = min(minCost, costs[vec])
+	}
+	q := []vector{}
+	for _, vec := range costGroups[m.end] {
+		if costs[vec] == minCost {
+			q = append(q, prevs[vec]...)
+		}
+	}
+	unique := map[coordinate]bool{}
+	for _, v := range q {
+		unique[v.c] = true
+	}
+	unique[m.end] = true
+	unique[m.start] = true
+	m.print(unique)
+	return minCost, len(unique)
+}
+
+func (m maze) dfsExactCost(curr vector, costToEnd int, valid map[coordinate]bool, prev map[vector]bool, connections map[vector]map[state]bool) bool {
+	if present, ok := prev[curr]; ok && present {
+		return false
+	}
+	if costToEnd < 0 {
+		return false
+	}
+	if curr.c == m.end && costToEnd == 0 {
+		valid[curr.c] = true
+		return true
+	}
+	destinations := connections[curr]
+	endIsReachable := false
+	prev[curr] = true
+	for dest := range destinations {
+		foundTheEnd := m.dfsExactCost(dest.v, costToEnd-dest.cost, valid, prev, connections)
+		if foundTheEnd {
+			valid[curr.c] = true
+			endIsReachable = true
+		}
+	}
+	prev[curr] = false
+	return endIsReachable
 }
 
 func (m maze) print(valid map[coordinate]bool) {
 	for i, t := range m.tiles {
 		for j, cell := range t {
 			if valid[coordinate{i, j}] {
-				fmt.Print("O")
+				fmt.Print("🦌")
 			} else {
-				fmt.Print(cell)
+				if cell == "." {
+					fmt.Print("⬜")
+				} else {
+					fmt.Print("🌲")
+				}
 			}
 		}
 		fmt.Println()
@@ -139,35 +209,13 @@ func (m maze) progress(mapC map[coordinate]float64) {
 	}
 }
 
-func dfsExactCost(graph map[coordinate][]coordinate, curr coordinate, m maze, valid *map[coordinate]bool, prev map[coordinate]bool) bool {
-	if present, ok := prev[curr]; ok && present {
-		return false
-	}
-	if curr == m.end {
-		(*valid)[curr] = true
-		return true
-	}
-	destinations := graph[curr]
-	endIsReachable := false
-	prev[curr] = true
-	//m.print(prev)
-	for _, dest := range destinations {
-		foundTheEnd := dfsExactCost(graph, dest, m, valid, prev)
-		if foundTheEnd {
-			(*valid)[curr] = true
-			endIsReachable = true
-		}
-	}
-	prev[curr] = false
-	return endIsReachable
-}
-
 func main() {
 	start := time.Now()
 
-	m := readFile("day16/input_exp_1.txt") // TODO delte me: p1 sol 108504
-	costToEnd, _ := m.dsa()
+	m := readFile("day16/input.txt")
+	costToEnd, connections := m.dsa()
 	fmt.Println("Part 1:", costToEnd)
+	fmt.Println("Part 2:", connections)
 
 	fmt.Println("Finished in", time.Since(start))
 }
