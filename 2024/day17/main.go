@@ -2,14 +2,12 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"math"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -193,7 +191,7 @@ func runComputerFor8s(file string) {
 		fmt.Println(c.concatOutputs(), len(c.outputs))
 	}
 	init := 0
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 200000; i++ {
 		c := readFile(file)
 		c.regA = init
 		c.executeInstructions()
@@ -219,70 +217,22 @@ func runComputerFor1s(file string) {
 	}
 }
 
-func bruteForceP2(file string, numWorkers int, lowerBound, upperBound int) int {
-	if numWorkers <= 0 {
-		numWorkers = 1
-	}
-
-	// Shared channels and context for coordination
-	resultChan := make(chan int)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var wg sync.WaitGroup
-
-	// Worker function that processes a specific range
-	worker := func(workerID, start, end, step int, ctx context.Context, resultChan chan int) {
-		defer wg.Done()
-
-		fmt.Printf("Worker %d started: range [%d - %d]\n", workerID, start, end)
-		for a := start; a != end; a += step {
-			select {
-			case <-ctx.Done(): // Stop if another goroutine found the result
-				return
-			default:
-				c := readFile(file) // Reset the state
-				c.regA = a
-				if c.executeInstructionsWithAbort() {
-					// Found the correct 'a', send the result and cancel others
-					resultChan <- a
-					cancel()
-					return
-				}
-
-				// Print worker progress every 100,000 iterations
-				if (a-start)%1000 == 0 {
-					percentage := float64(a-start) / float64(end-start) * 100
-					fmt.Printf("Worker %d progress: %.10f%%\n", workerID, percentage)
-				}
-			}
+func bruteForceP2(file string) int {
+	solA := -1
+	indx := 0
+	for indx < 16 {
+		solA = solA + 1
+		c := readFile(file)
+		c.regA = solA
+		c.executeInstructions()
+		if reflect.DeepEqual(c.outputs[len(c.outputs)-1-indx:len(c.outputs)], c.instructions[len(c.outputs)-1-indx:len(c.outputs)]) {
+			solA = solA << 3
+			indx++
+			fmt.Printf("Indx: %d \n", indx)
 		}
-		fmt.Printf("Worker %d finished without finding the result.\n", workerID)
 	}
 
-	// Calculate the total range and divide it among workers
-	totalRange := upperBound - lowerBound
-	chunkSize := totalRange / numWorkers
-
-	// Launch workers
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		start := lowerBound + i*chunkSize
-		end := start + chunkSize
-
-		// Ensure the last worker processes up to the exact upperBound
-		if i == numWorkers-1 {
-			end = upperBound
-		}
-
-		step := 1 // Forward search
-		go worker(i+1, start, end, step, ctx, resultChan)
-	}
-
-	// Wait for a result and return it
-	result := <-resultChan
-	wg.Wait() // Ensure all goroutines are cleaned up
-	return result
+	return solA
 }
 
 func main() {
@@ -293,11 +243,8 @@ func main() {
 	comptr.executeInstructions()
 	fmt.Println("Part 1:", comptr.concatOutputs())
 	fmt.Println("Len instructions: ", len(comptr.instructions))
-	runComputerFor1s(file)
-	runComputerFor2s(file)
-	runComputerFor8s(file)
 	//runComputerForUser(file)
-	fmt.Println("Part 2: ", bruteForceP2(file, 1200, 246290604621826, 281474976710656))
+	fmt.Println("Part 2: ", bruteForceP2(file))
 
 	fmt.Println("Finished in", time.Since(start))
 }
