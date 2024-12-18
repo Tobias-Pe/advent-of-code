@@ -152,6 +152,9 @@ func runComputerForUser(file string) {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("A: ")
 		text, _ := reader.ReadString('\n')
+		if strings.TrimSpace(text) == "abort" {
+			return
+		}
 		atoi, err := strconv.Atoi(strings.TrimSpace(strings.ReplaceAll(text, ".", "")))
 		if err != nil {
 			fmt.Println(err)
@@ -217,22 +220,46 @@ func runComputerFor1s(file string) {
 	}
 }
 
-func bruteForceP2(file string) int {
-	solA := -1
-	indx := 0
-	for indx < 16 {
-		solA = solA + 1
-		c := readFile(file)
-		c.regA = solA
-		c.executeInstructions()
-		if reflect.DeepEqual(c.outputs[len(c.outputs)-1-indx:len(c.outputs)], c.instructions[len(c.outputs)-1-indx:len(c.outputs)]) {
-			solA = solA << 3
-			indx++
-			fmt.Printf("Indx: %d \n", indx)
+func bruteForceP2(file string, solA, indx, targetIndx int) int {
+	if indx == targetIndx {
+		if solA < int(math.Pow(8, float64(targetIndx-1))) {
+			return -1
+		}
+		comptr := readFile(file)
+		comptr.regA = solA
+		success := comptr.executeInstructionsWithAbort()
+		if success {
+			return solA
+		}
+		return -1
+	}
+
+	if indx == 0 {
+		solA = 0
+	} else {
+		solA = solA << 3
+	}
+
+	for num := range 8 {
+		a := solA | num
+		comptr := readFile(file)
+		comptr.regA = a
+		comptr.executeInstructions()
+		outLen := indx + 1
+		if len(comptr.outputs) < outLen {
+			continue
+		}
+		outRelevant := comptr.outputs[len(comptr.outputs)-outLen:]
+		instructRelevant := comptr.instructions[len(comptr.instructions)-outLen:]
+		if reflect.DeepEqual(outRelevant, instructRelevant) {
+			sol := bruteForceP2(file, a, outLen, targetIndx)
+			if sol != -1 {
+				return sol
+			}
 		}
 	}
 
-	return solA
+	return -1
 }
 
 func main() {
@@ -242,9 +269,8 @@ func main() {
 	comptr := readFile(file)
 	comptr.executeInstructions()
 	fmt.Println("Part 1:", comptr.concatOutputs())
-	fmt.Println("Len instructions: ", len(comptr.instructions))
 	//runComputerForUser(file)
-	fmt.Println("Part 2: ", bruteForceP2(file))
+	fmt.Println("Part 2: ", bruteForceP2(file, 0, 0, len(comptr.instructions)))
 
 	fmt.Println("Finished in", time.Since(start))
 }
