@@ -85,16 +85,24 @@ func (cM *corruptingMemory) bfs() (int, bool) {
 	return cost, ok
 }
 
-func (cM *corruptingMemory) findPathBlockingByte() coordinate {
-	for len(cM.fallingBytes) > 0 {
-		tmp := cM.fallingBytes[0]
-		cM.letTimePass()
-		_, thereIsAWay := cM.bfs()
-		if !thereIsAWay {
-			return tmp
+func findPathBlockingByte(file string) coordinate {
+	fallingBytes := readFile(file, 71, 71).fallingBytes
+	left := 0
+	right := len(fallingBytes) - 1
+	lastFound := -1
+	for left < right {
+		mid := ((right - left) / 2) + left
+		mem := readFile(file, 71, 71)
+		mem.letTimePassTimes(mid)
+		_, found := mem.bfs()
+		if found {
+			left = mid + 1
+			lastFound = mid
+		} else {
+			right = mid - 1
 		}
 	}
-	return coordinate{-1, -1}
+	return coordinate{fallingBytes[lastFound].j, fallingBytes[lastFound].i}
 }
 
 func main() {
@@ -102,16 +110,13 @@ func main() {
 
 	//memory := readFile("day18/input_exp.txt", 7, 7)
 	//memory.letTimePassTimes(12)
-	memory := readFile("day18/input.txt", 71, 71)
+	file := "day18/input.txt"
+	memory := readFile(file, 71, 71)
 	memory.letTimePassTimes(1024)
 	cost, _ := memory.bfs()
 	fmt.Println("Part 1:", cost)
-	memory = readFile("day18/input.txt", 71, 71)
-	//memory = readFile("day18/input_exp.txt", 7, 7)
-	blockingByte := memory.findPathBlockingByte()
-	blockingByte.i, blockingByte.j = blockingByte.j, blockingByte.i
-	fmt.Println("Part 2:", blockingByte)
 	fmt.Println(memory.String())
+	fmt.Println("Part 2:", findPathBlockingByte(file))
 	fmt.Println("Finished in", time.Since(start))
 }
 
