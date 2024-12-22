@@ -36,7 +36,7 @@ type race struct {
 	racetrack  [][]string
 	start, end coordinate
 	cheatCosts map[cheat]int
-	baseCost   int
+	path       map[coordinate]int
 }
 
 func (r race) isValid(coord coordinate) bool {
@@ -58,15 +58,15 @@ func (r race) print(visited map[coordinate]bool) {
 	fmt.Println(sb.String())
 }
 
-func (r race) getCheatDestinations(origin coordinate, dur int, visited map[coordinate]bool) map[cheat]int {
+func (r race) getCheatDestinations(origin coordinate, dur int) map[cheat]int {
 	walls := map[coordinate]int{}
 	q := []coordinate{origin}
-	for i := 1; i < dur; i++ {
+	for i := 1; i <= dur; i++ {
 		newQ := []coordinate{}
 		for _, wall := range q {
 			neighbours := wall.getNeighbours()
 			for _, n := range neighbours {
-				if _, ok := walls[n]; r.isValid(n) && r.racetrack[n.i][n.j] == "#" && !ok {
+				if _, ok := walls[n]; r.isValid(n) && !ok {
 					walls[n] = i
 					newQ = append(newQ, n)
 				}
@@ -75,64 +75,54 @@ func (r race) getCheatDestinations(origin coordinate, dur int, visited map[coord
 		q = newQ
 	}
 	possibilities := map[cheat]int{}
-	for wall, dist := range walls {
-		neighbours := wall.getNeighbours()
-		for _, n := range neighbours {
-			if n == origin || visited[n] {
-				continue
-			}
-			if r.isValid(n) && r.racetrack[n.i][n.j] == "." {
-				possibilities[cheat{
-					from: origin,
-					to:   n,
-				}] = dist + 1
-			}
+	for field, dist := range walls {
+		if r.isValid(field) && field != origin && r.racetrack[field.i][field.j] == "." {
+			possibilities[cheat{
+				from: origin,
+				to:   field,
+			}] = dist
 		}
 	}
 	return possibilities
 }
 
-func (r *race) dfs(cheatDist int, curr coordinate, visited map[coordinate]bool, depthLvl int, currCheat *cheat) {
-	if visited[curr] || !r.isValid(curr) || r.racetrack[curr.i][curr.j] == "#" || (r.baseCost != 0 && cheatDist > r.baseCost) {
-		return
-	}
-
-	if curr == r.end {
-		if currCheat != nil {
-			r.cheatCosts[*currCheat] = depthLvl
-		} else {
-			r.baseCost = depthLvl
-		}
-		return
-	}
-
-	visited[curr] = true
-	neighbours := curr.getNeighbours()
-	for _, neighbour := range neighbours {
-		if !r.isValid(neighbour) || visited[neighbour] {
-			continue
-		}
-		r.dfs(cheatDist, neighbour, visited, depthLvl+1, currCheat)
-
-		if currCheat != nil || r.racetrack[neighbour.i][neighbour.j] == "#" {
-			continue
-		}
-
-		cheats := r.getCheatDestinations(curr, cheatDist, visited)
+func (r race) calcCheatSaves(cheatDist int) {
+	for c, costFromStart := range r.path {
+		cheats := r.getCheatDestinations(c, cheatDist)
 		for cheat, duration := range cheats {
-			if _, ok := r.cheatCosts[cheat]; !r.isValid(cheat.to) || visited[cheat.to] || ok {
+			if _, ok := r.cheatCosts[cheat]; !r.isValid(cheat.to) || ok {
 				continue
 			}
-			r.dfs(cheatDist, cheat.to, visited, depthLvl+duration, &cheat)
+			costToEnd := r.path[r.end] - r.path[cheat.to]
+			r.cheatCosts[cheat] = duration + costToEnd + costFromStart
 		}
 	}
-	delete(visited, curr)
+}
+
+func (r *race) dfsPath(curr coordinate, from coordinate, depthLvl int) {
+	if !r.isValid(curr) || r.racetrack[curr.i][curr.j] == "#" {
+		return
+	}
+
+	r.path[curr] = depthLvl
+	if curr == r.end {
+		fmt.Println("Base Found")
+		return
+	}
+
+	neighbours := curr.getNeighbours()
+	for _, neighbour := range neighbours {
+		if !r.isValid(neighbour) || from == neighbour || r.racetrack[neighbour.i][neighbour.j] == "#" {
+			continue
+		}
+		r.dfsPath(neighbour, curr, depthLvl+1)
+	}
 }
 
 func (r race) cheatCount(minSaveAmount int) int {
 	costDistribution := make(map[int]int)
 	for _, cost := range r.cheatCosts {
-		saved := r.baseCost - cost
+		saved := r.path[r.end] - cost
 		if saved >= minSaveAmount {
 			costDistribution[saved]++
 		}
@@ -148,7 +138,7 @@ func (r race) cheatCount(minSaveAmount int) int {
 
 	sum := 0
 	for _, cost := range r.cheatCosts {
-		saved := r.baseCost - cost
+		saved := r.path[r.end] - cost
 		if saved >= minSaveAmount {
 			sum++
 		}
@@ -161,14 +151,14 @@ func main() {
 
 	start := time.Now()
 	rctrck := readFile(file)
-	rctrck.dfs(2, rctrck.start, make(map[coordinate]bool), 0, nil)
+	rctrck.dfsPath(rctrck.start, coordinate{}, 0)
+	rctrck.calcCheatSaves(2)
 	fmt.Println("Part 1:", rctrck.cheatCount(100))
 	fmt.Println("P1 Finished in", time.Since(start))
 
 	start = time.Now()
-	rctrck2 := readFile(file)
-	rctrck2.dfs(20, rctrck2.start, make(map[coordinate]bool), 0, nil)
-	fmt.Println("Part 2:", rctrck2.cheatCount(100))
+	rctrck.calcCheatSaves(20)
+	fmt.Println("Part 2:", rctrck.cheatCount(100))
 	fmt.Println("Finished in", time.Since(start))
 }
 
@@ -181,7 +171,7 @@ func readFile(file string) race {
 	lines = strings.ReplaceAll(lines, "\r\n", "\n")
 	lines = strings.TrimSpace(lines)
 	split := strings.Split(lines, "\n")
-	race := race{cheatCosts: map[cheat]int{}}
+	race := race{cheatCosts: map[cheat]int{}, path: map[coordinate]int{}}
 	racetrack := make([][]string, len(split))
 	for i := range racetrack {
 		racetrack[i] = make([]string, len(split[i]))
