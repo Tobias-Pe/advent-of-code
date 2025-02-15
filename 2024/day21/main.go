@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Tobias-Pe/advent-of-code/util"
 	"math"
 	"os"
 	"strconv"
@@ -9,198 +10,201 @@ import (
 	"time"
 )
 
-type coordinate struct {
-	i, j int
-}
-
-func (c coordinate) sub(other coordinate) coordinate {
-	return coordinate{c.i - other.i, c.j - other.j}
-}
-
-type padRes struct {
-	dest coordinate
-	res  []string
-}
-
-type padQuery struct {
-	origin coordinate
-	code   string
+type query struct {
+	from string
+	to   string
 }
 
 type pad struct {
-	buttons map[string]coordinate
-	pos     coordinate
-	dp      map[padQuery]padRes
+	buttons      [][]string
+	buttonsMap   map[string]util.Coordinate
+	combinations map[query][]string
 }
 
-func creadNumPad() pad {
-	nP := pad{}
-	nP.buttons = make(map[string]coordinate)
-	nP.buttons["7"] = coordinate{0, 0}
-	nP.buttons["8"] = coordinate{0, 1}
-	nP.buttons["9"] = coordinate{0, 2}
-	nP.buttons["4"] = coordinate{1, 0}
-	nP.buttons["5"] = coordinate{1, 1}
-	nP.buttons["6"] = coordinate{1, 2}
-	nP.buttons["1"] = coordinate{2, 0}
-	nP.buttons["2"] = coordinate{2, 1}
-	nP.buttons["3"] = coordinate{2, 2}
-	nP.buttons[""] = coordinate{3, 0}
-	nP.buttons["0"] = coordinate{3, 1}
-	nP.buttons["A"] = coordinate{3, 2}
-	nP.pos = coordinate{3, 2}
-	nP.dp = make(map[padQuery]padRes)
-	return nP
+func (p *pad) calcCombinations() {
+	p.buttonsMap = map[string]util.Coordinate{}
+	buttons := []string{}
+	for i, row := range p.buttons {
+		for j, cell := range row {
+			if p.buttons[i][j] == "" {
+				continue
+			}
+			p.buttonsMap[cell] = util.Coordinate{I: i, J: j}
+			buttons = append(buttons, cell)
+		}
+	}
+	p.combinations = make(map[query][]string)
+	for _, buttonFrom := range buttons {
+		for _, buttonTo := range buttons {
+			q := query{buttonFrom, buttonTo}
+			if buttonFrom == buttonTo {
+				p.makeCombEntry(q, "")
+				continue
+			}
+
+			possiblePaths := p.dfs(q)
+			for _, possiblePath := range possiblePaths {
+				p.makeCombEntry(q, possiblePath)
+			}
+		}
+	}
+}
+
+func (p *pad) makeCombEntry(q query, s string) {
+	if _, exists := p.combinations[q]; !exists {
+		p.combinations[q] = []string{}
+	}
+	p.combinations[q] = append(p.combinations[q], s)
+}
+
+type dfsResult struct {
+	way     string
+	currPos util.Coordinate
+}
+
+func (p *pad) dfs(q query) []string {
+	queue := []dfsResult{{
+		way:     "",
+		currPos: p.buttonsMap[q.from],
+	}}
+	visited := map[util.Coordinate]bool{}
+	var sols []dfsResult
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+
+		if curr.currPos == p.buttonsMap[q.to] {
+			sols = append(sols, curr)
+			continue
+		}
+
+		if p.buttons[curr.currPos.I][curr.currPos.J] == "" {
+			continue
+		}
+
+		if _, ok := visited[curr.currPos.Left()]; !ok && curr.currPos.Left().IsValid(len(p.buttons), len(p.buttons[0])) {
+			queue = append(queue, dfsResult{curr.way + "<", curr.currPos.Left()})
+		}
+		if _, ok := visited[curr.currPos.Right()]; !ok && curr.currPos.Right().IsValid(len(p.buttons), len(p.buttons[0])) {
+			queue = append(queue, dfsResult{curr.way + ">", curr.currPos.Right()})
+		}
+		if _, ok := visited[curr.currPos.Up()]; !ok && curr.currPos.Up().IsValid(len(p.buttons), len(p.buttons[0])) {
+			queue = append(queue, dfsResult{curr.way + "^", curr.currPos.Up()})
+		}
+		if _, ok := visited[curr.currPos.Down()]; !ok && curr.currPos.Down().IsValid(len(p.buttons), len(p.buttons[0])) {
+			queue = append(queue, dfsResult{curr.way + "v", curr.currPos.Down()})
+		}
+		visited[curr.currPos] = true
+	}
+	minSolLen := math.MaxInt32
+	for _, sol := range sols {
+		minSolLen = min(minSolLen, len(sol.way))
+	}
+	var result []string
+	for _, sol := range sols {
+		if len(sol.way) > minSolLen {
+			continue
+		}
+		result = append(result, sol.way)
+	}
+	return result
+}
+
+func (p *pad) Execute(code string) []string {
+	var sols []string
+	curr := "A"
+	for _, i32Letter := range code {
+		letter := string(i32Letter)
+		combs := p.combinations[query{curr, letter}]
+		if len(sols) == 0 {
+			sols = append([]string{}, combs...)
+		} else {
+			var tmp []string
+			for _, sol := range sols {
+				for _, comb := range combs {
+					tmp = append(tmp, sol+comb)
+				}
+			}
+			sols = tmp
+		}
+		for i := range sols {
+			sols[i] = sols[i] + "A"
+		}
+		curr = letter
+	}
+	return sols
+}
+
+func createNumPad() pad {
+	p := pad{}
+	p.buttons = [][]string{
+		{"7", "8", "9"},
+		{"4", "5", "6"},
+		{"1", "2", "3"},
+		{"", "0", "A"},
+	}
+	p.calcCombinations()
+	return p
 }
 
 func createDirPad() pad {
-	dP := pad{}
-	dP.buttons = make(map[string]coordinate)
-	dP.buttons[""] = coordinate{0, 0}
-	dP.buttons["^"] = coordinate{0, 1}
-	dP.buttons["A"] = coordinate{0, 2}
-	dP.buttons["<"] = coordinate{1, 0}
-	dP.buttons["v"] = coordinate{1, 1}
-	dP.buttons[">"] = coordinate{1, 2}
-	dP.pos = coordinate{0, 2}
-	dP.dp = make(map[padQuery]padRes)
-	return dP
-}
-
-type dirCombos struct {
-	hori, verti int
-	curr        string
-}
-
-var dp = map[dirCombos][]string{}
-
-func combinate(hori, verti int, curr string) []string {
-	if val, ok := dp[dirCombos{
-		hori:  hori,
-		verti: verti,
-		curr:  curr,
-	}]; ok {
-		return val
+	p := pad{}
+	p.buttons = [][]string{
+		{"", "^", "A"},
+		{"<", "v", ">"},
 	}
-	results := []string{}
-	if hori > 0 {
-		results = append(results, combinate(hori-1, verti, curr+"-")...)
-	}
-	if verti > 0 {
-		results = append(results, combinate(hori, verti-1, curr+"|")...)
-	}
-	if hori == 0 && verti == 0 {
-		results = append(results, curr)
-	}
-	dp[dirCombos{
-		hori:  hori,
-		verti: verti,
-		curr:  curr,
-	}] = results
-	return results
-}
-
-func (p *pad) goTo(dest string) []string {
-	if val, ok := p.dp[padQuery{
-		origin: p.pos,
-		code:   dest,
-	}]; ok {
-		p.pos = val.dest
-		return val.res
-	}
-
-	if dest == "" {
-		panic("Not allowed empty string")
-	}
-	oldPos := p.pos
-	diff := p.buttons[dest].sub(oldPos)
-	p.pos = p.buttons[dest]
-
-	rawCombinations := combinate(int(math.Abs(float64(diff.j))), int(math.Abs(float64(diff.i))), "")
-	combinations := make([]string, len(rawCombinations))
-	for i, combination := range rawCombinations {
-		combinations[i] = combination
-		if diff.i > 0 {
-			combinations[i] = strings.ReplaceAll(combinations[i], "|", "v")
-		} else {
-			combinations[i] = strings.ReplaceAll(combinations[i], "|", "^")
-		}
-		if diff.j > 0 {
-			combinations[i] = strings.ReplaceAll(combinations[i], "-", ">")
-		} else {
-			combinations[i] = strings.ReplaceAll(combinations[i], "-", "<")
-		}
-	}
-	p.dp[padQuery{
-		origin: oldPos,
-		code:   dest,
-	}] = padRes{
-		dest: p.pos,
-		res:  combinations,
-	}
-	return combinations
-}
-
-func (p pad) execute(codes map[string]bool) map[string]bool {
-	results := map[string]bool{}
-	for code, _ := range codes {
-		for _, result := range p.executeRecurse(code, "") {
-			results[result] = true
-		}
-	}
-	return results
-}
-
-func (p pad) executeRecurse(code string, curr string) []string {
-	results := []string{}
-	if len(code) == 0 {
-		results = append(results, curr)
-		return results
-	}
-
-	res := p.goTo(string(code[0]))
-	for i := 0; i < len(res); i++ {
-		results = append(results, p.executeRecurse(code[1:], curr+res[i]+"A")...)
-	}
-	return results
+	p.calcCombinations()
+	return p
 }
 
 type spaceShip struct {
 	numPad pad
 	robot1 pad
 	robot2 pad
-	me     pad
-	result string
 	code   string
 }
 
 func createSpaceShip(code string) spaceShip {
 	spcShip := spaceShip{}
 
-	spcShip.numPad = creadNumPad()
+	spcShip.numPad = createNumPad()
 	spcShip.robot1 = createDirPad()
 	spcShip.robot2 = createDirPad()
-	spcShip.me = createDirPad()
 
 	spcShip.code = code
 
 	return spcShip
 }
 
-func (s *spaceShip) execute() {
-	initCode := make(map[string]bool)
-	initCode[s.code] = true
-	resultNumPad := s.numPad.execute(initCode)
-	resultRobot1 := s.robot1.execute(resultNumPad)
-	resultRobot2 := s.robot2.execute(resultRobot1)
-	resultMe := s.me.execute(resultRobot2)
-	minRes := ""
-	for s2, _ := range resultMe {
-		if minRes == "" || len(s2) < len(minRes) {
-			minRes = s2
+func (s *spaceShip) executeOn(codes []string, target *pad) []string {
+	var resultCodes []string
+	for _, neededInstruction := range codes {
+		res := target.Execute(neededInstruction)
+		resultCodes = append(resultCodes, res...)
+	}
+	minLen := math.MaxInt32
+	for _, instructionCode := range resultCodes {
+		minLen = min(minLen, len(instructionCode))
+	}
+	var minResultCodes []string
+	for _, instructionCode := range resultCodes {
+		if len(instructionCode) == minLen {
+			minResultCodes = append(minResultCodes, instructionCode)
 		}
 	}
-	s.result = minRes
+	return minResultCodes
+}
+
+func (s *spaceShip) execute() []string {
+	instructionCodes := s.executeOn([]string{s.code}, &s.numPad)
+	instructionCodes = s.executeOn(instructionCodes, &s.robot1)
+	instructionCodes = s.executeOn(instructionCodes, &s.robot2)
+	return instructionCodes
+}
+
+func (s *spaceShip) executeAndPickRandom() string {
+	codes := s.execute()
+	return codes[0]
 }
 
 func main() {
@@ -210,13 +214,13 @@ func main() {
 	scoreSum := 0
 	for i, code := range codes {
 		ship := createSpaceShip(code)
-		ship.execute()
+		result := ship.executeAndPickRandom()
 		numPart, err := strconv.Atoi(strings.Trim(code, "A"))
 		if err != nil {
 			return
 		}
-		score := numPart * len(ship.result)
-		fmt.Println(i, code, numPart, "*", len(ship.result), ship.result)
+		score := numPart * len(result)
+		fmt.Println(i, code, numPart, "*", len(result), result)
 		scoreSum += score
 	}
 	fmt.Println("Part 1:", scoreSum)
