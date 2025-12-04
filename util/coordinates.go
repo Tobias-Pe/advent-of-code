@@ -14,6 +14,10 @@ func (c Coordinate) GetNeighbours() []Coordinate {
 	return []Coordinate{{c.I + 1, c.J}, {c.I - 1, c.J}, {c.I, c.J + 1}, {c.I, c.J - 1}}
 }
 
+func (c Coordinate) GetNeighbours8() []Coordinate {
+	return append(c.GetNeighbours(), Coordinate{c.I + 1, c.J + 1}, Coordinate{c.I - 1, c.J + 1}, Coordinate{c.I + 1, c.J - 1}, Coordinate{c.I - 1, c.J - 1})
+}
+
 func (c Coordinate) IsValid(iMax, jMax int) bool {
 	return c.I >= 0 && c.J >= 0 && c.I < iMax && c.J < jMax
 }
