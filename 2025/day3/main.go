@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/Tobias-Pe/advent-of-code/util"
 )
 
 type Bank struct {
@@ -44,28 +42,34 @@ func (b Bank) LargestPossibleJoltageP1() int {
 }
 
 func (b Bank) LargestPossibleJoltageP2() int64 {
-	fmt.Print(b.batteries)
-	maxStck := util.Stack[int]{}
-
-	// Hier something something stack WIP TODO YAY YIPPIE 🐈
+	//fmt.Print(b.batteries)
+	nums := make([]int, 12)
+	lastTakenIdx := -1
+	for i := range nums {
+		maxJ := len(b.batteries) - (12 - i)
+		maxJoltage := 0
+		for j := lastTakenIdx + 1; j <= maxJ; j++ {
+			if b.batteries[j] > maxJoltage {
+				maxJoltage = b.batteries[j]
+				lastTakenIdx = j
+			}
+		}
+		nums[i] = maxJoltage
+	}
 
 	strNum := ""
-	for !maxStck.IsEmpty() {
-		strNum += strconv.Itoa(maxStck.Pop())
+	for i := range nums {
+		strNum += strconv.Itoa(nums[i])
 	}
-	r := []rune(strNum)
-	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
-		r[i], r[j] = r[j], r[i]
-	}
-	res, _ := strconv.ParseInt(string(r), 10, 64)
-	fmt.Println("|", res)
+	res, _ := strconv.ParseInt(strNum, 10, 64)
+	//fmt.Println("|", res)
 	return res
 }
 
 func main() {
 	start := time.Now()
 
-	lines := readFile("day3/input-example.txt")
+	lines := readFile("day3/input.txt")
 	banks := make([]*Bank, len(lines))
 	for i, line := range lines {
 		banks[i] = NewBank(line)
